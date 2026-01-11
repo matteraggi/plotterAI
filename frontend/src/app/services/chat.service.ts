@@ -14,9 +14,9 @@ export class ChatService {
 
     constructor(private http: HttpClient) { }
 
-    sendMessage(prompt: string): Observable<GenerateResponse> {
-        console.log('[ChatService] Sending message to backend:', prompt);
-        return this.http.post<GenerateResponse>(`${this.apiUrl}/generate`, { prompt }).pipe(
+    sendMessage(prompt: string, style: 'icon' | 'illustration'): Observable<GenerateResponse> {
+        console.log('[ChatService] Sending message to backend:', prompt, style);
+        return this.http.post<GenerateResponse>(`${this.apiUrl}/generate`, { prompt, style }).pipe(
             tap({
                 next: (response) => console.log('[ChatService] Received response:', response),
                 error: (error) => console.error('[ChatService] Error receiving response:', error)

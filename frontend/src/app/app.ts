@@ -4,11 +4,12 @@ import { HeaderComponent } from './header/header.component';
 import { ChatInputComponent } from './chat-input/chat-input.component';
 import { ChatMessageComponent, ChatMessage } from './chat-message/chat-message.component';
 import { ChatService, GenerateResponse } from './services/chat.service';
+import { ComposerComponent } from './composer/composer.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, HeaderComponent, ChatInputComponent, ChatMessageComponent],
+  imports: [CommonModule, HeaderComponent, ChatInputComponent, ChatMessageComponent, ComposerComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })
@@ -16,17 +17,19 @@ export class App {
   messages = signal<ChatMessage[]>([]);
   isLoading = signal(false);
   showDrawModal = signal(false);
+  showComposer = signal(false);
   pendingImageUrl = signal<string | null>(null);
 
   constructor(private chatService: ChatService) { }
 
-  handleSend(content: string) {
-    // ... existing code ...
+  handleSend(payload: { prompt: string, style: 'icon' | 'illustration' }) {
+    // ... (previous code same)
+    const { prompt, style } = payload;
     // Add user message
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
-      content
+      content: prompt
     };
     this.messages.update(msgs => [...msgs, userMsg]);
 
@@ -36,7 +39,7 @@ export class App {
     // Call API
     this.isLoading.set(true);
     console.log('[App] Calling ChatService...');
-    this.chatService.sendMessage(content).subscribe({
+    this.chatService.sendMessage(prompt, style).subscribe({
       next: (response: GenerateResponse) => {
         this.isLoading.set(false);
         console.log('[App] Response in component:', response);
@@ -66,7 +69,19 @@ export class App {
 
   handleDraw(imageUrl: string) {
     this.pendingImageUrl.set(imageUrl);
-    this.showDrawModal.set(true);
+    this.showComposer.set(true); // Open Composer first
+  }
+
+  handleComposerPrint(currentImageUrl: string) {
+    // In a real app we would pass the modified SVG/Coordinates.
+    // For now we pass the original image URL but this is the trigger point.
+    this.showComposer.set(false);
+    this.showDrawModal.set(true); // Open Safety Modal
+  }
+
+  handleComposerCancel() {
+    this.showComposer.set(false);
+    this.pendingImageUrl.set(null);
   }
 
   confirmDraw() {
@@ -80,6 +95,8 @@ export class App {
 
   closeModal() {
     this.showDrawModal.set(false);
+    // Don't clear pendingImageUrl here if we want to go back to composer? 
+    // Usually printing finishes the flow.
     this.pendingImageUrl.set(null);
   }
 }

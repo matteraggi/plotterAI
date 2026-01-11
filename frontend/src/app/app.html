@@ -61,6 +61,12 @@
 
 <app-chat-input (send)="handleSend($event)"></app-chat-input>
 
+<!-- Composer View -->
+@if (showComposer() && pendingImageUrl()) {
+<app-composer [imageUrl]="pendingImageUrl()!" (cancel)="handleComposerCancel()"
+  (print)="handleComposerPrint($event)"></app-composer>
+}
+
 <!-- Pre-flight Modal -->
 @if (showDrawModal()) {
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">

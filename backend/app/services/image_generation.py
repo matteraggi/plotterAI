@@ -3,15 +3,16 @@ import base64
 import time
 import os
 from app.core.config import settings
-from app.core.prompts import PLOTTER_SYSTEM_PROMPT
+from app.core.prompts import PLOTTER_SYSTEM_PROMPT, PRESET_SIMPLE, PRESET_COMPLEX
 
 class ImageGenerationService:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-image-1-mini"
 
-    async def generate_image(self, prompt: str) -> str:
-        full_prompt = f"{PLOTTER_SYSTEM_PROMPT} {prompt}"
+    async def generate_image(self, prompt: str, complexity: str = "simple") -> str:
+        preset_prompt = PRESET_SIMPLE if complexity == "simple" else PRESET_COMPLEX
+        full_prompt = f"{PLOTTER_SYSTEM_PROMPT}\nDensity: {preset_prompt}\nSubject to draw: {prompt}"
         
         try:
             response = await self.client.images.generate(

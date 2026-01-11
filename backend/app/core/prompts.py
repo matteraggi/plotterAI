@@ -10,8 +10,9 @@ Prohibitions: Strictly avoid all shading, gradients, shadows, or textures. No 3D
 
 Background: The background must be absolute pure white (#FFFFFF).
 
-Style: Create minimalist line art or single-line drawings. Avoid large solid black filled areas as they are difficult for a plotter to execute.
+Line: Clean, thin, sharp contour lines. Distinct and well-defined.
+"""
 
-Simplicity: Prioritize structural clarity over artistic complexity to ensure a smooth path for the pen.
+PRESET_SIMPLE = "Style: Extreme minimalist line art, very few essential lines, no fine details."
 
-Subject to draw: """
+PRESET_COMPLEX = "Style: Intricate line art, high level of detail, complex patterns, many fine lines, professional plotter illustration style."

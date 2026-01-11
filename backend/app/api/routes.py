@@ -7,6 +7,7 @@ router = APIRouter()
 
 class GenerateRequest(BaseModel):
     prompt: str
+    complexity: str = "simple" # "simple" | "complex"
 
 class GenerateResponse(BaseModel):
     image_url: str
@@ -19,7 +20,7 @@ def health_check():
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_image(request: GenerateRequest, req: Request):
     try:
-        image_result = await image_generation_service.generate_image(request.prompt)
+        image_result = await image_generation_service.generate_image(request.prompt, request.complexity)
         
         # If result is a relative path (starts with /static), make it absolute
         if image_result and image_result.startswith("/static"):
@@ -33,6 +34,7 @@ async def generate_image(request: GenerateRequest, req: Request):
             prompt=request.prompt
         )
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 @router.post("/vectorize")
 async def vectorize_image_endpoint(request: GenerateResponse): 
     # Reusing GenerateResponse which has image_url, or create new model. 
