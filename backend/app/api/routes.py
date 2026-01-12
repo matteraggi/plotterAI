@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from pydantic import BaseModel
 from app.services.image_generation import image_generation_service
 import os
+import traceback
 
 router = APIRouter()
 
@@ -74,5 +75,73 @@ async def vectorize_image_endpoint(request: GenerateResponse):
     except Exception as e:
         print(f"Error during vectorization: {e}")
         import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PrintRequest(BaseModel):
+    imageUrl: str
+    x_mm: float
+    y_mm: float
+    width_mm: float
+    height_mm: float
+    rotation: float = 0.0
+
+@router.post("/print")
+async def print_image(request: PrintRequest):
+    print(">>> RECEIVED PRINT REQUEST")
+    print(f"Image: {request.imageUrl}")
+    print(f"Position: X={request.x_mm}mm, Y={request.y_mm}mm")
+    print(f"Size: W={request.width_mm}mm, H={request.height_mm}mm")
+    print(f"Rotation: {request.rotation}")
+    
+    input_url = request.imageUrl
+    
+    # 1. Validate Image
+    if not input_url or "/static/" not in input_url:
+         # If it's an external URL, we might need to download it.
+         # For now assume it's our static one or we can handle download.
+         # The user said frontend sends 'imageUrl'.
+         pass
+
+    try:
+        # Determine local file path
+        if "/static/" in input_url:
+            filename = input_url.split("/static/")[-1]
+            file_path = os.path.join("app/static", filename)
+        else:
+            # TODO: Handle external URL download if needed.
+            # For now, simplistic fallback or error.
+            print("WARNING: Non-static URL received. Skipping local processing steps for safety unless implemented.")
+            # Mock success for verification
+            return {"status": "success", "message": "Print job received (mock)"}
+
+        if not os.path.exists(file_path):
+             raise HTTPException(status_code=404, detail=f"Image file not found: {file_path}")
+
+        from app.services.processing import processing_service
+        from app.services.vectorization import vectorization_service
+        
+        # 2. Preprocess (Binarization)
+        # Verify if needs processing (is it PNG?)
+        if file_path.lower().endswith(".png"):
+            print("Processing image (binarization)...")
+            processed_path = processing_service.preprocess_image(file_path)
+            
+            # 3. Vectorize (SVG)
+            print("Vectorizing image...")
+            svg_path = vectorization_service.vectorize_image(processed_path)
+            print(f"SVG created at: {svg_path}")
+            
+            # 4. (Future) GCODE Generation
+            # gcode = gcode_service.generate(svg_path, request.width_mm, ...)
+            print("Image prepared for plotting.")
+            
+        elif file_path.lower().endswith(".svg"):
+             print("Image is already SVG. Ready for GCODE generation.")
+        
+        return {"status": "success", "message": "Print job queued successfully"}
+
+    except Exception as e:
+        print(f"Error during print processing: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

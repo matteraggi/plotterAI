@@ -1,5 +1,6 @@
 import { Component, Input, Output, EventEmitter, signal, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { PrintPayload } from '../services/chat.service';
 
 @Component({
   selector: 'app-composer',
@@ -21,7 +22,7 @@ import { CommonModule } from '@angular/common';
            Composizione A4
         </div>
 
-        <button (click)="print.emit(imageUrl)" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 text-sm font-medium transition-all">
+        <button (click)="onPrint()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 text-sm font-medium transition-all">
           <span class="flex items-center gap-2">
             Stampa
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -50,6 +51,7 @@ import { CommonModule } from '@angular/common';
                 [style.top.px]="imgY"
                 [style.width.px]="imgWidth"
                 [style.height.px]="imgHeight"
+                [style.transform]="'rotate(' + rotation + 'deg)'"
                 (mousedown)="onMouseDown($event)">
                 
               <img [src]="imageUrl" 
@@ -81,7 +83,7 @@ import { CommonModule } from '@angular/common';
 export class ComposerComponent implements AfterViewInit {
   @Input({ required: true }) imageUrl!: string;
   @Output() cancel = new EventEmitter<void>();
-  @Output() print = new EventEmitter<string>();
+  @Output() print = new EventEmitter<PrintPayload>();
 
   @ViewChild('workspace') workspaceRef!: ElementRef;
 
@@ -94,6 +96,7 @@ export class ComposerComponent implements AfterViewInit {
   imgY = 0;
   imgWidth = 200;
   imgHeight = 200;
+  rotation = 0; // New rotation state
 
   // Dragging Implementation
   isDragging = false;
@@ -150,6 +153,24 @@ export class ComposerComponent implements AfterViewInit {
     }
   }
 
+  onPrint() {
+    // Calculate millimeters
+    // A4 is 210mm width.
+    const mmPerPixel = 210 / this.workspaceWidth;
+
+    const payload: PrintPayload = {
+      imageUrl: this.imageUrl,
+      x_mm: this.imgX * mmPerPixel,
+      y_mm: this.imgY * mmPerPixel,
+      width_mm: this.imgWidth * mmPerPixel,
+      height_mm: this.imgHeight * mmPerPixel,
+      rotation: this.rotation // Emit rotation
+    };
+
+    console.log('[Composer] Print Payload (mm):', payload);
+    this.print.emit(payload);
+  }
+
   // --- Dragging Logic ---
   onMouseDown(event: MouseEvent) {
     if (this.isResizing) return;
@@ -169,14 +190,7 @@ export class ComposerComponent implements AfterViewInit {
       this.imgY = this.initialImgY + dy;
     } else if (this.isResizing) {
       const dx = event.clientX - this.resizeStartX;
-      // Maintain aspect ratio? For now let's allow free resize or maybe fix ratio later.
-      // Let's implement simple scaling.
-      // Ideally we want to scale based on diagonal movement to keep aspect ratio 
-      // but for now simple width/height adjustment.
 
-      // Simple uniform scale based on width change for now to keep aspect ratio of image?
-      // Let's just do free resize for flexibility as per request "manipolazione".
-      // Actually, assuming user wants to keep aspect ratio is safer for drawings.
       const scaleFactor = (this.initialImgWidth + dx) / this.initialImgWidth;
 
       this.imgWidth = this.initialImgWidth * scaleFactor;

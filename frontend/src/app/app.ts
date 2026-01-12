@@ -1,9 +1,9 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HeaderComponent } from './header/header.component';
 import { ChatInputComponent } from './chat-input/chat-input.component';
 import { ChatMessageComponent, ChatMessage } from './chat-message/chat-message.component';
-import { ChatService, GenerateResponse } from './services/chat.service';
+import { ChatService, GenerateResponse, PrintPayload } from './services/chat.service';
 import { ComposerComponent } from './composer/composer.component';
 
 @Component({
@@ -19,11 +19,26 @@ export class App {
   showDrawModal = signal(false);
   showComposer = signal(false);
   pendingImageUrl = signal<string | null>(null);
+  pendingPrintPayload = signal<PrintPayload | null>(null);
 
-  constructor(private chatService: ChatService) { }
+  constructor(private chatService: ChatService) {
+    // Restore history
+    const saved = localStorage.getItem('plotter_chat_history');
+    if (saved) {
+      try {
+        this.messages.set(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse chat history', e);
+      }
+    }
+
+    // Persist history
+    effect(() => {
+      localStorage.setItem('plotter_chat_history', JSON.stringify(this.messages()));
+    });
+  }
 
   handleSend(payload: { prompt: string, style: 'icon' | 'illustration' }) {
-    // ... (previous code same)
     const { prompt, style } = payload;
     // Add user message
     const userMsg: ChatMessage = {
@@ -72,10 +87,8 @@ export class App {
     this.showComposer.set(true); // Open Composer first
   }
 
-  handleComposerPrint(currentImageUrl: string) {
-    // In a real app we would pass the modified SVG/Coordinates.
-    // For now we pass the original image URL but this is the trigger point.
-    this.showComposer.set(false);
+  handleComposerPrint(payload: PrintPayload) {
+    this.pendingPrintPayload.set(payload);
     this.showDrawModal.set(true); // Open Safety Modal
   }
 
@@ -85,18 +98,28 @@ export class App {
   }
 
   confirmDraw() {
-    const url = this.pendingImageUrl();
-    if (url) {
-      console.log('Sending to plotter:', url);
-      alert(`Inviato al plotter: ${url}`);
+    const payload = this.pendingPrintPayload();
+    if (payload) {
+      console.log('Sending to plotter:', payload);
+      this.chatService.printImage(payload).subscribe({
+        next: () => {
+          alert('Disegno inviato correttamente al plotter!');
+          this.closeModal();
+        },
+        error: (err) => {
+          console.error('Error printing:', err);
+          alert('Errore invio al plotter. Controlla la console.');
+          // We close modal anyway? Or stick around?
+          this.closeModal();
+        }
+      });
+    } else {
+      this.closeModal();
     }
-    this.closeModal();
   }
 
   closeModal() {
     this.showDrawModal.set(false);
-    // Don't clear pendingImageUrl here if we want to go back to composer? 
-    // Usually printing finishes the flow.
-    this.pendingImageUrl.set(null);
+    this.pendingPrintPayload.set(null);
   }
 }
