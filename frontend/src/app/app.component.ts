@@ -20,6 +20,9 @@ export class AppComponent {
   pendingImageUrl = signal<string | null>(null);
   pendingPrintPayload = signal<PrintPayload | null>(null);
 
+  showRegenerateModal = signal(false);
+  pendingRegenerateMessage = signal<ChatMessage | null>(null);
+
   constructor(private chatService: ChatService) {
     // Restore history
     const saved = localStorage.getItem('plotter_chat_history');
@@ -84,6 +87,21 @@ export class AppComponent {
   }
 
   handleRegenerate(message: ChatMessage) {
+    this.pendingRegenerateMessage.set(message);
+    this.showRegenerateModal.set(true);
+  }
+
+  cancelRegenerate() {
+    this.showRegenerateModal.set(false);
+    this.pendingRegenerateMessage.set(null);
+  }
+
+  confirmRegenerate() {
+    const message = this.pendingRegenerateMessage();
+    if (!message) return;
+
+    this.closeRegenerateModal();
+
     let prompt = message.originalPrompt;
     let style = message.originalStyle;
 
@@ -146,6 +164,11 @@ export class AppComponent {
         }));
       }
     });
+  }
+
+  closeRegenerateModal() {
+    this.showRegenerateModal.set(false);
+    this.pendingRegenerateMessage.set(null);
   }
 
   handleDraw(imageUrl: string) {

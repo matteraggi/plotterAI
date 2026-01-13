@@ -14,18 +14,29 @@ class ProcessingService:
             
         # 2. Grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+        # --- NOVITÀ: RESTAURO LINEE ---
         
-        # 3. Otsu Thresholding
-        # Usiamo THRESH_BINARY_INV perché gli algoritmi morfologici 
-        # lavorano meglio con l'oggetto BIANCO su sfondo NERO
-        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+        # 3. Gaussian Blur: Sfoca leggermente per unire i pixel "vicini ma staccati"
+        # Ideale per i baffi e i contorni della scritta
+        blurred = cv2.GaussianBlur(gray, (3, 3), 0)
         
-        # 4. Skeletonization (Thinning)
-        # Riduce le linee a 1 pixel di spessore
-        skeleton = self._skeletonize(thresh)
+        # 4. Otsu Thresholding (Invertito)
+        _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         
-        # 5. Inversione finale per il salvataggio/vettorializzatore
-        # Riportiamo a: Sfondo Bianco, Linee Nere
+        # 5. Chiusura Morfologica: Tappa i micro-buchi all'interno delle linee nere
+        kernel_unione = np.ones((3, 3), np.uint8)
+
+        # 5. Chiusura Morfologica più forte ( iterations=2 per "saldare" i baffi)
+        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_unione, iterations=2)
+
+        # 6. Dilatazione più decisa
+        dilated = cv2.dilate(closed, kernel_unione, iterations=1)
+
+        # 7. Skeletonization (Thinning)
+        skeleton = self._skeletonize(dilated)
+        
+        # 8. Inversione finale per il salvataggio/vettorializzatore
         final_img = cv2.bitwise_not(skeleton)
         
         # Determinazione path di output
