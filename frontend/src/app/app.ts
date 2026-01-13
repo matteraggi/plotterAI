@@ -62,7 +62,9 @@ export class App {
           id: (Date.now() + 1).toString(),
           role: 'ai',
           content: 'Ecco il disegno generato:',
-          imageUrl: response.image_url
+          imageUrl: response.image_url,
+          originalPrompt: prompt,
+          originalStyle: style
         };
         console.log('[App] Created AI message with URL:', aiMsg.imageUrl);
         this.messages.update(msgs => [...msgs, aiMsg]);
@@ -78,6 +80,71 @@ export class App {
         };
         this.messages.update(msgs => [...msgs, errorMsg]);
         setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 50);
+      }
+    });
+  }
+
+  handleRegenerate(message: ChatMessage) {
+    let prompt = message.originalPrompt;
+    let style = message.originalStyle;
+
+    // Fallback: look for previous user message
+    if (!prompt) {
+      const msgs = this.messages();
+      const index = msgs.findIndex(m => m.id === message.id);
+      if (index > 0) {
+        const prevMsg = msgs[index - 1];
+        if (prevMsg.role === 'user') {
+          prompt = prevMsg.content;
+          style = 'icon'; // Default style for legacy messages
+        }
+      }
+    }
+
+    if (!prompt || !style) return;
+
+    // Optimistic update: clear image immediately to show loading state
+    const oldImageUrl = message.imageUrl;
+    this.messages.update(msgs => msgs.map(m => {
+      if (m.id === message.id) {
+        return { ...m, imageUrl: undefined };
+      }
+      return m;
+    }));
+
+    this.isLoading.set(true);
+    console.log('[App] Regenerating image...', prompt);
+
+    this.chatService.sendMessage(prompt, style).subscribe({
+      next: (response: GenerateResponse) => {
+        this.isLoading.set(false);
+        console.log('[App] Regenerated response:', response);
+
+        // Update the specific message
+        this.messages.update(msgs => msgs.map(m => {
+          if (m.id === message.id) {
+            return {
+              ...m,
+              imageUrl: response.image_url,
+              originalPrompt: prompt, // Save inferred data for next time
+              originalStyle: style
+            };
+          }
+          return m;
+        }));
+      },
+      error: (err: any) => {
+        this.isLoading.set(false);
+        console.error('[App] Error regenerating:', err);
+        alert('Errore durante la rigenerazione dell\'immagine.');
+
+        // Restore old image on error
+        this.messages.update(msgs => msgs.map(m => {
+          if (m.id === message.id) {
+            return { ...m, imageUrl: oldImageUrl };
+          }
+          return m;
+        }));
       }
     });
   }

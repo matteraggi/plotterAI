@@ -20,7 +20,7 @@
   <!-- Messages List -->
   <div class="flex flex-col w-full">
     @for (msg of messages(); track msg.id) {
-    <app-chat-message [message]="msg" (draw)="handleDraw($event)"></app-chat-message>
+    <app-chat-message [message]="msg" (draw)="handleDraw($event)" (regenerate)="handleRegenerate(msg)"></app-chat-message>
     }
 
     <!-- Loading Skeleton -->

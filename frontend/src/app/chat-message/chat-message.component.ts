@@ -6,6 +6,8 @@ export interface ChatMessage {
   role: 'user' | 'ai';
   content: string;
   imageUrl?: string;
+  originalPrompt?: string;
+  originalStyle?: 'icon' | 'illustration';
 }
 
 @Component({
@@ -49,8 +51,12 @@ export interface ChatMessage {
                   class="max-w-sm w-full h-auto object-cover" />
              
              <!-- Draw Button Overlay (or below) -->
-             <div class="p-3 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
-               <button (click)="onDraw()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
+             <div class="p-3 bg-white dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 flex gap-3">
+               <button (click)="regenerate.emit()" class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-200 text-sm font-medium rounded-lg transition-colors">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-refresh-cw"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/></svg>
+                 Rigenera
+               </button>
+               <button (click)="onDraw()" class="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors">
                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pen-tool"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
                  Disegna
                </button>
@@ -67,6 +73,7 @@ export interface ChatMessage {
 export class ChatMessageComponent {
   @Input({ required: true }) message!: ChatMessage;
   @Output() draw = new EventEmitter<string>();
+  @Output() regenerate = new EventEmitter<void>();
 
   onDraw() {
     if (this.message.imageUrl) {
