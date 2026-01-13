@@ -3,72 +3,59 @@ import numpy as np
 import os
 
 class VectorizationService:
-    def vectorize_image(self, input_path: str) -> str:
+    def vectorize_image(self, input_path: str, epsilon_coeff: float = 0.002) -> str:
         """
-        Converts the image to SVG paths using OpenCV contours.
-        Input is expected to be a binarized image (White BG, Black Lines).
+        Trasforma l'immagine in percorsi SVG ottimizzati.
+        epsilon_coeff: controlla la semplificazione (più alto = meno punti, più "morbido").
         """
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Image not found: {input_path}")
             
-        # Read image
         img = cv2.imread(input_path, cv2.IMREAD_GRAYSCALE)
         if img is None:
             raise ValueError(f"Could not read image: {input_path}")
             
-        # For findContours, objects should be White, BG Black.
-        # Our input is likely White BG, Black Lines. So we invert it.
+        # Invertiamo: findContours vuole l'oggetto bianco su fondo nero
         inverted = cv2.bitwise_not(img)
         
-        # Find contours
-        # RETR_LIST gives all contours. RETR_EXTERNAL only outer. RETR_TREE hierarchy.
-        # For a sketch, we probably want minimal hierarchy, just lines.
-        # CHAIN_APPROX_SIMPLE compresses horizontal, vertical, and diagonal segments.
+        # Trova i contorni
         contours, _ = cv2.findContours(inverted, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         
         height, width = img.shape
-        
-        # Build SVG content
-        svg_lines = []
-        svg_lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">')
-        
-        # Add a white background rect? Optional. Plotters don't need it.
+        svg_paths = []
         
         for contour in contours:
-            if len(contour) < 2:
+            # Semplificazione del tracciato (Ramer-Douglas-Peucker)
+            # epsilon è la massima distanza tra il contorno originale e la sua approssimazione
+            epsilon = epsilon_coeff * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, epsilon, False)
+            
+            if len(approx) < 2:
                 continue
                 
-            # Start path
-            # contour is a list of points [[[x, y]], [[x, y]], ...]
-            start_point = contour[0][0]
-            path_d = f"M {start_point[0]} {start_point[1]}"
+            # Costruzione del path D
+            points = approx.reshape(-1, 2)
+            path_data = f"M {points[0][0]} {points[0][1]}"
+            for i in range(1, len(points)):
+                path_data += f" L {points[i][0]} {points[i][1]}"
             
-            for i in range(1, len(contour)):
-                point = contour[i][0]
-                path_d += f" L {point[0]} {point[1]}"
+            # NOTA: Per un plotter, spesso NON vogliamo 'Z' (chiusura) 
+            # se stiamo disegnando linee aperte scheletrizzate.
+            # Se è un cerchio, lo chiuderà l'ultimo punto L che coincide con M.
             
-            # Close path if it's a closed loop? Usually contours are closed by definition in findContours
-            # But for drawing, we might just want the lines.
-            # Let's close it to be safe for filling, but for plotting "stroke" is what matters.
-            path_d += " Z"
-            
-            # Add path element
-            # fill="none" stroke="black" stroke-width="1"
-            svg_lines.append(f'<path d="{path_d}" fill="none" stroke="black" stroke-width="1"/>')
-            
-        svg_lines.append('</svg>')
+            svg_paths.append(f'<path d="{path_data}" fill="none" stroke="black" stroke-width="1"/>')
         
-        # Save SVG
-        dir_name = os.path.dirname(input_path)
-        base_name = os.path.basename(input_path)
-        name, _ = os.path.splitext(base_name)
-        # Remove _processed if it exists to keep name clean? Or keep it.
-        # Let's call it .svg
-        output_filename = f"{name}.svg"
-        output_path = os.path.join(dir_name, output_filename)
+        # Composizione file SVG
+        svg_content = [
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">',
+            *svg_paths,
+            '</svg>'
+        ]
+        
+        output_path = input_path.replace("_processed.png", ".svg").replace(".png", ".svg")
         
         with open(output_path, "w") as f:
-            f.write("\n".join(svg_lines))
+            f.write("\n".join(svg_content))
             
         return output_path
 

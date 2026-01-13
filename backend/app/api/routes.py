@@ -1,82 +1,24 @@
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from app.services.image_generation import image_generation_service
+from app.services.processing import processing_service
+from app.services.vectorization import vectorization_service
+from app.services.gcode import gcode_service
+from app.core.config import settings
 import os
 import traceback
+from pathlib import Path
 
 router = APIRouter()
 
+# --- Modelli Pydantic ---
 class GenerateRequest(BaseModel):
     prompt: str
-    complexity: str = "simple" # "simple" | "complex"
+    complexity: str = "simple"
 
 class GenerateResponse(BaseModel):
     image_url: str
     prompt: str
-
-@router.get("/health")
-def health_check():
-    return {"status": "ok"}
-
-@router.post("/generate", response_model=GenerateResponse)
-async def generate_image(request: GenerateRequest, req: Request):
-    try:
-        image_result = await image_generation_service.generate_image(request.prompt, request.complexity)
-        
-        # If result is a relative path (starts with /static), make it absolute
-        if image_result and image_result.startswith("/static"):
-            base_url = str(req.base_url).rstrip("/")
-            image_url = f"{base_url}{image_result}"
-        else:
-            image_url = image_result
-
-        return GenerateResponse(
-            image_url=image_url,
-            prompt=request.prompt
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-@router.post("/vectorize")
-async def vectorize_image_endpoint(request: GenerateResponse): 
-    # Reusing GenerateResponse which has image_url, or create new model. 
-    # Let's use a simple dict or new model for clear API.
-    # Actually, let's allow passing the URL returned by generate.
-    
-    input_url = request.image_url
-    if not input_url:
-        raise HTTPException(status_code=400, detail="Image URL is required")
-    
-    # Extract relative path from URL (remove http://.../static/)
-    # Assumption: URL ends with /static/filename.png
-    if "/static/" not in input_url:
-         raise HTTPException(status_code=400, detail="Invalid image URL format")
-    
-    filename = input_url.split("/static/")[-1]
-    file_path = os.path.join("app/static", filename)
-    
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Image file not found")
-        
-    try:
-        from app.services.processing import processing_service
-        from app.services.vectorization import vectorization_service
-        
-        # 1. Preprocess
-        processed_path = processing_service.preprocess_image(file_path)
-        
-        # 2. Vectorize
-        svg_path = vectorization_service.vectorize_image(processed_path)
-        
-        # 3. Return SVG URL
-        # Construct simplified URL
-        svg_filename = os.path.basename(svg_path)
-        return {"svg_url": f"/static/{svg_filename}"}
-        
-    except Exception as e:
-        print(f"Error during vectorization: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
 
 class PrintRequest(BaseModel):
     imageUrl: str
@@ -86,60 +28,88 @@ class PrintRequest(BaseModel):
     height_mm: float
     rotation: float = 0.0
 
-@router.post("/print")
-async def print_image(request: PrintRequest):
-    print(">>> RECEIVED PRINT REQUEST")
-    print(f"Image: {request.imageUrl}")
-    print(f"Position: X={request.x_mm}mm, Y={request.y_mm}mm")
-    print(f"Size: W={request.width_mm}mm, H={request.height_mm}mm")
-    print(f"Rotation: {request.rotation}")
-    
-    input_url = request.imageUrl
-    
-    # 1. Validate Image
-    if not input_url or "/static/" not in input_url:
-         # If it's an external URL, we might need to download it.
-         # For now assume it's our static one or we can handle download.
-         # The user said frontend sends 'imageUrl'.
-         pass
+# --- Routes ---
 
+@router.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+@router.post("/generate", response_model=GenerateResponse)
+async def generate_image(request: GenerateRequest, req: Request):
     try:
-        # Determine local file path
-        if "/static/" in input_url:
-            filename = input_url.split("/static/")[-1]
-            file_path = os.path.join("app/static", filename)
+        # Passiamo la complexity al service (che la userà nel system prompt)
+        image_result = await image_generation_service.generate_image(request.prompt, request.complexity)
+        
+        if image_result and image_result.startswith("/static"):
+            base_url = str(req.base_url).rstrip("/")
+            image_url = f"{base_url}{image_result}"
         else:
-            # TODO: Handle external URL download if needed.
-            # For now, simplistic fallback or error.
-            print("WARNING: Non-static URL received. Skipping local processing steps for safety unless implemented.")
-            # Mock success for verification
-            return {"status": "success", "message": "Print job received (mock)"}
+            image_url = image_result
 
-        if not os.path.exists(file_path):
-             raise HTTPException(status_code=404, detail=f"Image file not found: {file_path}")
+        return GenerateResponse(image_url=image_url, prompt=request.prompt)
+    except Exception as e:
+        print(f"ERROR GENERATION: {e}")
+        raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
 
-        from app.services.processing import processing_service
-        from app.services.vectorization import vectorization_service
+# NOTA: Rimosso 'async' perché le operazioni di immagine sono CPU-bound (pesanti)
+# Usando 'def' standard, FastAPI le esegue in un threadpool senza bloccare gli altri utenti
+@router.post("/print")
+def print_image(request: PrintRequest):
+    """
+    Riceve le coordinate dall'interfaccia Angular e avvia la pipeline:
+    Processing -> Vectorization -> GCode -> Plotting
+    """
+    print(f">>> PRINT REQUEST: {request.imageUrl} at ({request.x_mm}, {request.y_mm})")
+    
+    # 1. Identificazione sicura del file locale
+    try:
+        if "/static/" not in request.imageUrl:
+            raise HTTPException(status_code=400, detail="Only local static images are supported for now.")
         
-        # 2. Preprocess (Binarization)
-        # Verify if needs processing (is it PNG?)
-        if file_path.lower().endswith(".png"):
-            print("Processing image (binarization)...")
-            processed_path = processing_service.preprocess_image(file_path)
-            
-            # 3. Vectorize (SVG)
-            print("Vectorizing image...")
-            svg_path = vectorization_service.vectorize_image(processed_path)
-            print(f"SVG created at: {svg_path}")
-            
-            # 4. (Future) GCODE Generation
-            # gcode = gcode_service.generate(svg_path, request.width_mm, ...)
-            print("Image prepared for plotting.")
-            
-        elif file_path.lower().endswith(".svg"):
-             print("Image is already SVG. Ready for GCODE generation.")
+        # Estraiamo il nome file in modo più robusto usando Path
+        filename = request.imageUrl.split("/static/")[-1].split("?")[0] # Rimuove eventuali query params
         
-        return {"status": "success", "message": "Print job queued successfully"}
+        # Costruiamo il path assoluto rispetto alla cartella app
+        base_path = Path(__file__).resolve().parent.parent / "static"
+        file_path = base_path / filename
+
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail=f"File not found on disk: {file_path}")
+
+        # 2. Pipeline di elaborazione
+        # NOTA: In un prodotto reale qui useresti BackgroundTasks perché il plotter è lento
+        
+        # A. Binarizzazione e pulizia (OpenCV)
+        print("Step 1: Preprocessing...")
+        processed_path = processing_service.preprocess_image(str(file_path))
+        
+        # B. Vettorializzazione (Potrace/Centerline)
+        print("Step 2: Vectorizing...")
+        svg_path = vectorization_service.vectorize_image(processed_path)
+        
+        # C. Generazione G-Code con trasformazione coordinate
+        # Qui passiamo i millimetri e la scala decisi dall'utente in Angular
+        print("Step 3: Generating G-Code...")
+        gcode_data = gcode_service.generate_gcode(
+            svg_path=svg_path,
+            target_x=request.x_mm,
+            target_y=request.y_mm,
+            target_width=request.width_mm,
+            target_height=request.height_mm,
+            rotation=request.rotation
+        )
+        
+        # D. Invio ai motori (su Raspberry Pi)
+        # gcode_service.execute_plot(gcode_data) # Questo muoverà i GPIO
+
+        return {
+            "status": "success", 
+            "message": "Image processed and sent to plotter",
+            "details": {
+                "svg": os.path.basename(svg_path),
+                "commands": len(gcode_data)
+            }
+        }
 
     except Exception as e:
         print(f"Error during print processing: {e}")
