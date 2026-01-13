@@ -10,10 +10,9 @@ import { ComposerComponent } from './composer/composer.component';
   selector: 'app-root',
   standalone: true,
   imports: [CommonModule, HeaderComponent, ChatInputComponent, ChatMessageComponent, ComposerComponent],
-  templateUrl: './app.html',
-  styleUrl: './app.css'
+  templateUrl: './app.component.html'
 })
-export class App {
+export class AppComponent {
   messages = signal<ChatMessage[]>([]);
   isLoading = signal(false);
   showDrawModal = signal(false);

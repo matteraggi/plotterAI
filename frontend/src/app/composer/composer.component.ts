@@ -6,78 +6,7 @@ import { PrintPayload } from '../services/chat.service';
   selector: 'app-composer',
   standalone: true,
   imports: [CommonModule],
-  template: `
-    <div class="fixed inset-0 z-[50] bg-zinc-200/90 dark:bg-zinc-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-      
-      <!-- Toolbar -->
-      <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-10">
-        <button (click)="cancel.emit()" class="px-4 py-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 text-sm font-medium transition-colors">
-          <span class="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-            Indietro
-          </span>
-        </button>
-
-        <div class="px-4 py-2 bg-white dark:bg-zinc-900 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800 text-sm font-semibold text-zinc-800 dark:text-zinc-200">
-           Composizione A4
-        </div>
-
-        <button (click)="onPrint()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 text-sm font-medium transition-all">
-          <span class="flex items-center gap-2">
-            Stampa
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-          </span>
-        </button>
-      </div>
-
-      <!-- Workspace (A4 Aspect Ratio: 1 : 1.414) -->
-      <!-- Added border so it is visible against light backgrounds -->
-      <div #workspace class="relative bg-white shadow-2xl border border-zinc-300 overflow-hidden cursor-crosshair transition-all duration-300 ease-out"
-           [style.width.px]="workspaceWidth"
-           [style.height.px]="workspaceHeight"
-           (mousemove)="onMouseMove($event)"
-           (mouseup)="onMouseUp()"
-           (mouseleave)="onMouseUp()">
-           
-           <!-- Grid (Optional, decorative) -->
-           <div class="absolute inset-0 pointer-events-none opacity-20" 
-                style="background-image: radial-gradient(#9ca3af 1px, transparent 1px); background-size: 20px 20px;">
-           </div>
-
-           <!-- Draggable Image -->
-           @if (imageUrl) {
-           <div class="absolute cursor-move select-none group"
-                [style.left.px]="imgX"
-                [style.top.px]="imgY"
-                [style.width.px]="imgWidth"
-                [style.height.px]="imgHeight"
-                [style.transform]="'rotate(' + rotation + 'deg)'"
-                (mousedown)="onMouseDown($event)">
-                
-              <img [src]="imageUrl" 
-                   (load)="onImageLoad()"
-                   class="w-full h-full object-contain pointer-events-none" 
-                   draggable="false" />
-              
-              <!-- Selection Border & Handles (Visible only on hover or active) -->
-              <div class="absolute inset-0 border-2 border-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-                   [class.opacity-100]="isDragging || isResizing"></div>
-              
-              <!-- Resize Handle (Bottom Right) -->
-              <div class="absolute -bottom-1.5 -right-1.5 w-4 h-4 bg-indigo-600 border-2 border-white rounded-full cursor-nwse-resize opacity-0 group-hover:opacity-100 pointer-events-auto"
-                   [class.opacity-100]="isDragging || isResizing"
-                   (mousedown)="onResizeStart($event)"></div>
-           </div>
-           }
-
-      </div>
-
-      <div class="absolute bottom-6 text-zinc-500 font-medium text-xs bg-white/50 px-3 py-1 rounded-full backdrop-blur-md">
-         Trascina per spostare. Usa l'angolo in basso a destra per ridimensionare.
-      </div>
-
-    </div>
-  `,
+  templateUrl: './composer.component.html',
   styles: []
 })
 export class ComposerComponent implements AfterViewInit {

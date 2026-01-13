@@ -1,0 +1,49 @@
+<div
+    class="fixed bottom-0 left-0 w-full bg-white dark:bg-zinc-950 p-4 pb-6 border-t border-zinc-200 dark:border-zinc-800">
+    <div class="max-w-screen-md mx-auto relative flex items-end gap-3">
+
+        <!-- Style Toggle -->
+        <div class="relative pb-2">
+            <button (click)="toggleStyle()"
+                class="p-3 rounded-xl transition-all duration-200 group relative overflow-hidden"
+                [class.bg-indigo-100]="style === 'icon'" [class.text-indigo-600]="style === 'icon'"
+                [class.dark:bg-indigo-900/30]="style === 'icon'" [class.dark:text-indigo-400]="style === 'icon'"
+                [class.bg-purple-100]="style === 'illustration'" [class.text-purple-600]="style === 'illustration'"
+                [class.dark:bg-purple-900/30]="style === 'illustration'"
+                [class.dark:text-purple-400]="style === 'illustration'"
+                [title]="style === 'icon' ? 'Stile: Icona (Semplice)' : 'Stile: Illustrazione (Complesso)'">
+                @if (style === 'icon') {
+                <!-- Diagonal Line Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 20L20 4" />
+                </svg>
+                }
+                @if (style === 'illustration') {
+                <!-- Google Fonts Gesture Icon -->
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 -960 960 960"
+                    fill="currentColor">
+                    <path
+                        d="M554-120q-54 0-91-37t-37-89q0-76 61.5-137.5T641-460q-3-36-18-54.5T582-533q-30 0-65 25t-83 82q-78 93-114.5 121T241-277q-51 0-86-38t-35-92q0-54 23.5-110.5T223-653q19-26 28-44t9-29q0-7-2.5-10.5T250-740q-10 0-25 12.5T190-689l-70-71q32-39 65-59.5t65-20.5q46 0 78 32t32 80q0 29-15 64t-50 84q-38 54-56.5 95T220-413q0 17 5.5 26.5T241-377q10 0 17.5-5.5T286-409q13-14 31-34.5t44-50.5q63-75 114-107t107-32q67 0 110 45t49 123h99v100h-99q-8 112-58.5 178.5T554-120Zm2-100q32 0 54-36.5T640-358q-46 11-80 43.5T526-250q0 14 8 22t22 8Z" />
+                </svg>
+                }
+            </button>
+        </div>
+
+        <div class="relative flex-1">
+            <textarea [(ngModel)]="prompt" (keydown.enter)="onEnter($event)"
+                placeholder="Chiedi di disegnare qualcosa..."
+                class="w-full bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-2xl pl-4 pr-12 py-3.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 resize-none overflow-hidden min-h-[52px] max-h-32"
+                rows="1"></textarea>
+
+            <button (click)="sendPrompt()" [disabled]="!prompt.trim()"
+                class="absolute right-2 bottom-2.5 p-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-zinc-300 disabled:dark:bg-zinc-800 text-white rounded-xl transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m22 2-7 20-4-9-9-4Z" />
+                    <path d="M22 2 11 13" />
+                </svg>
+            </button>
+        </div>
+    </div>
+</div>
