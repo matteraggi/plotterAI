@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import os
+from skimage.morphology import skeletonize
+from skimage import util
 
 class ProcessingService:
     def preprocess_image(self, input_path: str) -> str:
@@ -15,29 +17,38 @@ class ProcessingService:
         # 2. Grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        # --- NOVITÀ: RESTAURO LINEE ---
-        
         # 3. Gaussian Blur: Sfoca leggermente per unire i pixel "vicini ma staccati"
-        # Ideale per i baffi e i contorni della scritta
         blurred = cv2.GaussianBlur(gray, (3, 3), 0)
         
-        # 4. Otsu Thresholding (Invertito)
+        # 4. Otsu Thresholding (Invertito: Oggetto Bianco, Sfondo Nero)
         _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
         
-        # 5. Chiusura Morfologica: Tappa i micro-buchi all'interno delle linee nere
-        kernel_unione = np.ones((3, 3), np.uint8)
+        # 5. Chiusura Morfologica: Tappa i micro-buchi all'interno delle linee
+        # Usiamo un kernel ellittico che è più naturale per i tratti a mano
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-        # 5. Chiusura Morfologica più forte ( iterations=2 per "saldare" i baffi)
-        closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel_unione, iterations=2)
+        # 6. Dilatazione leggera per unire tratti molto vicini prima dello scheletro
+        dilated = cv2.dilate(closed, kernel, iterations=1)
 
-        # 6. Dilatazione più decisa
-        dilated = cv2.dilate(closed, kernel_unione, iterations=1)
-
-        # 7. Skeletonization (Thinning)
-        skeleton = self._skeletonize(dilated)
+        # 7. Skeletonization con Scikit-Image (Metodo Lee)
+        # Scikit-image vuole un array booleano (True/False) o 0/1.
+        # Convertiamo l'immagine OpenCV (0-255) in bool.
+        binary_bool = dilated > 127
+        
+        # Eseguiamo la scheletrizzazione
+        skeleton_bool = skeletonize(binary_bool, method='lee')
+        
+        # Convertiamo di nuovo in uint8 (0-255) per OpenCV
+        skeleton_uint8 = util.img_as_ubyte(skeleton_bool)
         
         # 8. Inversione finale per il salvataggio/vettorializzatore
-        final_img = cv2.bitwise_not(skeleton)
+        # Il vettorializzatore si aspetta: Sfondo Bianco, Linee Nere (o viceversa, ma controlliamo vectorization.py)
+        # vectorization.py fa: inverted = cv2.bitwise_not(img)
+        # Quindi si aspetta Sfondo Bianco (255), Linee Nere (0).
+        # skeleton_uint8 ha Linee Bianche (255), Sfondo Nero (0).
+        # Quindi dobbiamo invertire.
+        final_img = cv2.bitwise_not(skeleton_uint8)
         
         # Determinazione path di output
         dir_name = os.path.dirname(input_path)
@@ -49,32 +60,6 @@ class ProcessingService:
         cv2.imwrite(output_path, final_img)
         return output_path
 
-    def _skeletonize(self, img):
-        """ Algoritmo di scheletrizzazione morfologica """
-        size = np.size(img)
-        skel = np.zeros(img.shape, np.uint8)
-        
-        # Elemento strutturante a croce
-        element = cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3))
-        
-        done = False
-        temp_img = img.copy()
-        
-        while not done:
-            # Erosione
-            eroded = cv2.erode(temp_img, element)
-            # Apertura (Erosione poi Dilatazione)
-            temp = cv2.dilate(eroded, element)
-            # Sottrazione per trovare i bordi
-            temp = cv2.subtract(temp_img, temp)
-            # Unione nello scheletro
-            skel = cv2.bitwise_or(skel, temp)
-            temp_img = eroded.copy()
-            
-            zeros = size - cv2.countNonZero(temp_img)
-            if zeros == size:
-                done = True
-                
-        return skel
+    # _skeletonize rimosso perché usiamo skimage
 
 processing_service = ProcessingService()

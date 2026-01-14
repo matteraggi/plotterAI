@@ -6,3 +6,4 @@ python-dotenv
 httpx
 opencv-python-headless
 numpy
+scikit-image
